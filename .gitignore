@@ -1,0 +1,12 @@
+agent-tools
+coverage.out
+coverage.html
+data/
+*.db
+*.db-wal
+*.db-shm
+.air.toml
+dist/
+vendor/
+.env
+*.env

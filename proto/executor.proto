@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package agenttools.executor.v1;
+
+option go_package = "github.com/clawinfra/agent-tools/proto/executor/v1";
+
+// ToolExecutor is the gRPC service that provider agents implement.
+// Consumers invoke tools through this interface via the invocation router.
+service ToolExecutor {
+  // Execute invokes a registered tool with the given input.
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+
+  // Health returns provider health status.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message ExecuteRequest {
+  // tool_id is the DID of the tool to invoke.
+  string tool_id = 1;
+
+  // invocation_id is assigned by the registry for tracking.
+  string invocation_id = 2;
+
+  // input_json is the JSON-encoded tool input (validated against schema).
+  string input_json = 3;
+
+  // consumer_id is the DID of the requesting agent.
+  string consumer_id = 4;
+
+  // escrow_id is the ClawChain escrow transaction hash (v0.3+).
+  string escrow_id = 5;
+}
+
+message ExecuteResponse {
+  // output_json is the JSON-encoded tool output.
+  string output_json = 1;
+
+  // output_hash is the SHA-256 of output_json, for receipt verification.
+  string output_hash = 2;
+
+  // provider_sig is the Ed25519 signature over the receipt blob.
+  string provider_sig = 3;
+
+  // cost_claw is the actual cost charged (decimal CLAW string).
+  string cost_claw = 4;
+
+  // duration_ms is the tool execution time in milliseconds.
+  int64 duration_ms = 5;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  enum Status {
+    STATUS_UNKNOWN = 0;
+    STATUS_HEALTHY = 1;
+    STATUS_DEGRADED = 2;
+    STATUS_OFFLINE = 3;
+  }
+
+  Status status = 1;
+  string message = 2;
+  int32 active_tools = 3;
+  int64 total_invocations = 4;
+}
