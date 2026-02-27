@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -161,7 +162,11 @@ func TestToolSearchCmd_MissingQuery(t *testing.T) {
 
 // TestInitCmd_WritesConfig verifies config file is created.
 func TestInitCmd_WritesConfig(t *testing.T) {
-	t.Chdir(t.TempDir())
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	os.Chdir(tmpDir)
+	t.Cleanup(func() { os.Chdir(origDir) })
+
 	root := cli.NewRootCmd()
 	root.SetArgs([]string{"init"})
 	err := root.Execute()
