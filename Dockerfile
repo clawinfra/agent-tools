@@ -11,7 +11,7 @@ RUN go mod download
 
 # Build
 COPY . .
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o agent-tools ./cmd/agent-tools
+RUN CGO_ENABLED=1 go build -tags sqlite_fts5 -ldflags="-s -w" -o agent-tools ./cmd/agent-tools
 
 # ---
 

@@ -4,15 +4,16 @@ BINARY     := agent-tools
 MAIN       := ./cmd/agent-tools
 COVERAGE   := coverage.out
 THRESHOLD  := 90
+TAGS       := sqlite_fts5
 
 build:
-	go build -ldflags="-s -w" -o $(BINARY) $(MAIN)
+	CGO_ENABLED=1 go build -tags $(TAGS) -ldflags="-s -w" -o $(BINARY) $(MAIN)
 
 test:
-	go test -v -race ./...
+	CGO_ENABLED=1 go test -v -race -tags $(TAGS) ./...
 
 coverage:
-	go test -race -coverprofile=$(COVERAGE) -covermode=atomic ./...
+	CGO_ENABLED=1 go test -race -tags $(TAGS) -coverprofile=$(COVERAGE) -covermode=atomic ./...
 	@go tool cover -func=$(COVERAGE) | grep total
 	@COVERAGE=$$(go tool cover -func=$(COVERAGE) | grep total | awk '{print $$3}' | sed 's/%//'); \
 	if [ $$(echo "$$COVERAGE < $(THRESHOLD)" | bc -l) -eq 1 ]; then \
@@ -29,7 +30,7 @@ lint:
 	golangci-lint run --timeout=5m
 
 vet:
-	go vet ./...
+	go vet -tags $(TAGS) ./...
 
 dev-setup:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest

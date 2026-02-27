@@ -3,6 +3,7 @@ package registry_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/clawinfra/agent-tools/internal/registry"
 	"github.com/clawinfra/agent-tools/internal/store"
@@ -302,7 +303,7 @@ func TestRecordInvocation(t *testing.T) {
 	tool, err := r.RegisterTool(ctx, validRegisterReq())
 	require.NoError(t, err)
 
-	id, err := r.RecordInvocation(ctx, tool.ID, "did:claw:agent:consumer", "sha256:abc123")
+	id, err := r.RecordInvocation(ctx, tool.ID, "did:claw:agent:consumer", map[string]any{"key": "value"})
 	require.NoError(t, err)
 	assert.NotEmpty(t, id)
 	assert.Contains(t, id, "inv_")
@@ -315,7 +316,7 @@ func TestCompleteInvocation(t *testing.T) {
 	tool, err := r.RegisterTool(ctx, validRegisterReq())
 	require.NoError(t, err)
 
-	invID, err := r.RecordInvocation(ctx, tool.ID, "did:claw:agent:consumer", "sha256:abc123")
+	invID, err := r.RecordInvocation(ctx, tool.ID, "did:claw:agent:consumer", map[string]any{"key": "value"})
 	require.NoError(t, err)
 
 	err = r.CompleteInvocation(ctx, invID, "sha256:output123", "ed25519:sig", "5.0")
@@ -329,9 +330,204 @@ func TestFailInvocation(t *testing.T) {
 	tool, err := r.RegisterTool(ctx, validRegisterReq())
 	require.NoError(t, err)
 
-	invID, err := r.RecordInvocation(ctx, tool.ID, "did:claw:agent:consumer", "sha256:abc123")
+	invID, err := r.RecordInvocation(ctx, tool.ID, "did:claw:agent:consumer", map[string]any{"key": "value"})
 	require.NoError(t, err)
 
 	err = r.FailInvocation(ctx, invID, "provider timeout")
 	require.NoError(t, err)
+}
+
+func TestRegisterProvider_Success(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	p := &registry.Provider{
+		ID:       "did:claw:agent:provider-1",
+		Name:     "Provider One",
+		Endpoint: "grpc://localhost:50051",
+		PubKey:   "ed25519pub1234",
+	}
+	got, err := r.RegisterProvider(ctx, p)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, p.ID, got.ID)
+	assert.Equal(t, p.Name, got.Name)
+	assert.Equal(t, "0", got.StakeCLAW)
+}
+
+func TestRegisterProvider_Upsert(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	p := &registry.Provider{
+		ID:       "did:claw:agent:provider-1",
+		Name:     "Provider One",
+		Endpoint: "grpc://localhost:50051",
+		PubKey:   "pubkey1",
+	}
+	_, err := r.RegisterProvider(ctx, p)
+	require.NoError(t, err)
+
+	p.Name = "Provider One Updated"
+	p.PubKey = "pubkey2"
+	got, err := r.RegisterProvider(ctx, p)
+	require.NoError(t, err)
+	assert.Equal(t, "Provider One Updated", got.Name)
+}
+
+func TestRegisterProvider_MissingID(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	_, err := r.RegisterProvider(ctx, &registry.Provider{
+		Endpoint: "grpc://localhost:50051",
+		PubKey:   "pubkey",
+	})
+	assert.Error(t, err)
+}
+
+func TestRegisterProvider_MissingEndpoint(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	_, err := r.RegisterProvider(ctx, &registry.Provider{
+		ID:     "did:claw:agent:x",
+		PubKey: "pubkey",
+	})
+	assert.Error(t, err)
+}
+
+func TestRegisterProvider_MissingPubKey(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	_, err := r.RegisterProvider(ctx, &registry.Provider{
+		ID:       "did:claw:agent:x",
+		Endpoint: "grpc://localhost:50051",
+	})
+	assert.Error(t, err)
+}
+
+func TestGetProvider_NotFound(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	_, err := r.GetProvider(ctx, "did:claw:agent:nonexistent")
+	assert.ErrorIs(t, err, registry.ErrNotFound)
+}
+
+func TestListProviders(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	providers, err := r.ListProviders(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, providers)
+
+	for i := 0; i < 3; i++ {
+		_, err := r.RegisterProvider(ctx, &registry.Provider{
+			ID:       "did:claw:agent:p" + string(rune('0'+i)),
+			Name:     "Provider " + string(rune('A'+i)),
+			Endpoint: "grpc://localhost:5005" + string(rune('1'+i)),
+			PubKey:   "pubkey" + string(rune('0'+i)),
+		})
+		require.NoError(t, err)
+	}
+
+	providers, err = r.ListProviders(ctx)
+	require.NoError(t, err)
+	assert.Len(t, providers, 3)
+}
+
+func TestToolSchemaValidate_InvalidOutputSchema(t *testing.T) {
+	ts := registry.ToolSchema{
+		Input:  []byte(`{"type":"object"}`),
+		Output: []byte(`{not valid}`),
+	}
+	assert.Error(t, ts.Validate())
+}
+
+func TestToolSchemaValidate_ValidNoOutput(t *testing.T) {
+	ts := registry.ToolSchema{
+		Input: []byte(`{"type":"object"}`),
+	}
+	assert.NoError(t, ts.Validate())
+}
+
+func TestInvokeRequest_Types(t *testing.T) {
+	req := &registry.InvokeRequest{
+		ToolID:     "did:claw:tool:abc",
+		Input:      map[string]any{"key": "value"},
+		BudgetCLAW: "5.0",
+		ConsumerID: "did:claw:agent:consumer",
+	}
+	assert.Equal(t, "did:claw:tool:abc", req.ToolID)
+	assert.Equal(t, "5.0", req.BudgetCLAW)
+}
+
+func TestReceipt_Fields(t *testing.T) {
+	now := time.Now()
+	r := &registry.Receipt{
+		ID:          "rcpt_abc",
+		ToolID:      "did:claw:tool:xyz",
+		ConsumerID:  "did:claw:agent:consumer",
+		ProviderID:  "did:claw:agent:provider",
+		InputHash:   "sha256:abc",
+		OutputHash:  "sha256:def",
+		CostCLAW:    "5.0",
+		ExecutedAt:  now,
+		ProviderSig: "ed25519:sig",
+	}
+	assert.Equal(t, "rcpt_abc", r.ID)
+	assert.Equal(t, "5.0", r.CostCLAW)
+}
+
+func TestSearchQuery_Defaults(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	// Register multiple tools with tags
+	for i := 0; i < 5; i++ {
+		req := validRegisterReq()
+		req.Name = "tagged-tool-" + string(rune('a'+i))
+		req.Tags = []string{"defi", "prices"}
+		_, err := r.RegisterTool(ctx, req)
+		require.NoError(t, err)
+	}
+
+	// Page 2 with limit
+	result, err := r.SearchTools(ctx, &registry.SearchQuery{Page: 2, Limit: 3})
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Page)
+}
+
+func TestRegisterTool_DefaultsApplied(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	req := validRegisterReq()
+	req.TimeoutMS = -1
+	req.Pricing = nil
+	tool, err := r.RegisterTool(ctx, req)
+	require.NoError(t, err)
+	assert.Equal(t, int64(30000), tool.TimeoutMS)
+	assert.Equal(t, registry.PricingFree, tool.Pricing.Model)
+}
+
+func TestInvocation_CompleteAndFail(t *testing.T) {
+	r := newTestRegistry(t)
+	ctx := context.Background()
+
+	tool, err := r.RegisterTool(ctx, validRegisterReq())
+	require.NoError(t, err)
+
+	invID, err := r.RecordInvocation(ctx, tool.ID, "consumer", map[string]any{"k": "v"})
+	require.NoError(t, err)
+
+	// Test double-path: complete then fail (overwrites)
+	err = r.CompleteInvocation(ctx, invID, "sha256:out", "sig", "1.0")
+	require.NoError(t, err)
+
+	err = r.FailInvocation(ctx, "nonexistent-inv", "timeout")
+	require.NoError(t, err) // No-op, no rows affected but no error
 }

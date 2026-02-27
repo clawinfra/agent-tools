@@ -52,6 +52,16 @@ func (r *Registry) RegisterTool(ctx context.Context, req *RegisterToolRequest) (
 	now := time.Now().Unix()
 	tags := strings.Join(req.Tags, ",")
 
+	// Auto-upsert the provider if not already registered (v0.1: no strict auth yet).
+	_, err = r.db.ExecContext(ctx, `
+		INSERT INTO providers (id, name, endpoint, pubkey, stake_claw, reputation, created_at, last_seen)
+		VALUES (?, '', '', '', '0', 0, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen
+	`, req.ProviderID, now, now)
+	if err != nil {
+		return nil, fmt.Errorf("upsert provider: %w", err)
+	}
+
 	_, err = r.db.ExecContext(ctx, `
 		INSERT INTO tools (id, name, version, description, schema_json, pricing, provider_id, endpoint, timeout_ms, tags, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -142,9 +152,9 @@ func (r *Registry) SearchTools(ctx context.Context, q *SearchQuery) (*SearchResu
 			SELECT t.id, t.name, t.version, t.description, t.schema_json, t.pricing, 
 			       t.provider_id, t.endpoint, t.timeout_ms, t.tags, t.created_at, t.updated_at, t.is_active
 			FROM tools t
-			JOIN tools_fts fts ON t.rowid = fts.rowid
-			WHERE fts MATCH ? AND t.is_active = 1
-			ORDER BY rank LIMIT ? OFFSET ?
+			WHERE t.is_active = 1
+			  AND t.rowid IN (SELECT rowid FROM tools_fts WHERE tools_fts MATCH ?)
+			ORDER BY t.created_at DESC LIMIT ? OFFSET ?
 		`, q.Query+"*", q.Limit, offset)
 	} else {
 		rows, err = r.db.QueryContext(ctx, `
@@ -187,13 +197,113 @@ func (r *Registry) DeactivateTool(ctx context.Context, id, providerID string) er
 	return nil
 }
 
-// RecordInvocation creates a new invocation record.
-func (r *Registry) RecordInvocation(ctx context.Context, toolID, consumerID string, inputHash string) (string, error) {
-	id := "inv_" + uuid.NewString()
+// RegisterProvider registers or upserts a provider.
+func (r *Registry) RegisterProvider(ctx context.Context, p *Provider) (*Provider, error) {
+	if p.ID == "" {
+		return nil, fmt.Errorf("provider id is required")
+	}
+	if p.Endpoint == "" {
+		return nil, fmt.Errorf("endpoint is required")
+	}
+	if p.PubKey == "" {
+		return nil, fmt.Errorf("pubkey is required")
+	}
+	now := time.Now().Unix()
+	if p.StakeCLAW == "" {
+		p.StakeCLAW = "0"
+	}
 	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO providers (id, name, endpoint, pubkey, stake_claw, reputation, created_at, last_seen)
+		VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			name=excluded.name,
+			endpoint=excluded.endpoint,
+			pubkey=excluded.pubkey,
+			stake_claw=excluded.stake_claw,
+			last_seen=excluded.last_seen
+	`, p.ID, p.Name, p.Endpoint, p.PubKey, p.StakeCLAW, now, now)
+	if err != nil {
+		return nil, fmt.Errorf("upsert provider: %w", err)
+	}
+	r.log.Info("provider registered", zap.String("id", p.ID))
+	return r.GetProvider(ctx, p.ID)
+}
+
+// GetProvider returns a provider by ID.
+func (r *Registry) GetProvider(ctx context.Context, id string) (*Provider, error) {
+	row := r.db.QueryRowContext(ctx, `
+		SELECT id, name, endpoint, pubkey, stake_claw, reputation, created_at, last_seen
+		FROM providers WHERE id = ?
+	`, id)
+	return scanProvider(row)
+}
+
+// ListProviders returns all providers.
+func (r *Registry) ListProviders(ctx context.Context) ([]*Provider, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id, name, endpoint, pubkey, stake_claw, reputation, created_at, last_seen
+		FROM providers ORDER BY reputation DESC, created_at DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list providers: %w", err)
+	}
+	defer rows.Close()
+
+	var providers []*Provider
+	for rows.Next() {
+		p, err := scanProviderRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		providers = append(providers, p)
+	}
+	return providers, rows.Err()
+}
+
+func scanProvider(row *sql.Row) (*Provider, error) {
+	var (
+		p         Provider
+		createdAt int64
+		lastSeen  int64
+	)
+	err := row.Scan(&p.ID, &p.Name, &p.Endpoint, &p.PubKey, &p.StakeCLAW, &p.Reputation, &createdAt, &lastSeen)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	p.CreatedAt = time.Unix(createdAt, 0)
+	p.LastSeen = time.Unix(lastSeen, 0)
+	return &p, nil
+}
+
+func scanProviderRow(rows *sql.Rows) (*Provider, error) {
+	var (
+		p         Provider
+		createdAt int64
+		lastSeen  int64
+	)
+	if err := rows.Scan(&p.ID, &p.Name, &p.Endpoint, &p.PubKey, &p.StakeCLAW, &p.Reputation, &createdAt, &lastSeen); err != nil {
+		return nil, err
+	}
+	p.CreatedAt = time.Unix(createdAt, 0)
+	p.LastSeen = time.Unix(lastSeen, 0)
+	return &p, nil
+}
+
+// RecordInvocation creates a new invocation record.
+// input is the raw input map; the hash is computed automatically.
+func (r *Registry) RecordInvocation(ctx context.Context, toolID, consumerID string, input map[string]any) (string, error) {
+	h, err := hashInput(input)
+	if err != nil {
+		return "", fmt.Errorf("hash input: %w", err)
+	}
+	id := "inv_" + uuid.NewString()
+	_, err = r.db.ExecContext(ctx, `
 		INSERT INTO invocations (id, tool_id, consumer_id, input_hash, started_at, status)
 		VALUES (?, ?, ?, ?, ?, 'pending')
-	`, id, toolID, consumerID, inputHash, time.Now().Unix())
+	`, id, toolID, consumerID, h, time.Now().Unix())
 	if err != nil {
 		return "", fmt.Errorf("record invocation: %w", err)
 	}
@@ -302,8 +412,5 @@ func assembleTool(t *Tool, schemaJSON, pricingJSON, tags string, createdAt, upda
 	t.CreatedAt = time.Unix(createdAt, 0)
 	t.UpdatedAt = time.Unix(updatedAt, 0)
 	t.IsActive = isActive == 1
-
-	// Expose hashInput for tests
-	_ = hashInput
 	return t, nil
 }

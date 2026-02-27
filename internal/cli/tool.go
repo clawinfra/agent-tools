@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -31,7 +32,7 @@ func newToolListCmd() *cobra.Command {
 		Short: "List all tools in the registry",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			client := agenttools.NewClient(registryURL)
-			result, err := client.ListTools(nil, &agenttools.ListToolsRequest{Limit: 50})
+			result, err := client.ListTools(context.Background(), &agenttools.ListToolsRequest{Limit: 50})
 			if err != nil {
 				return err
 			}
@@ -68,7 +69,7 @@ func newToolSearchCmd() *cobra.Command {
 				opts = append(opts, agenttools.WithMaxPrice(maxPrice))
 			}
 
-			result, err := client.SearchTools(nil, query, opts...)
+			result, err := client.SearchTools(context.Background(), query, opts...)
 			if err != nil {
 				return err
 			}

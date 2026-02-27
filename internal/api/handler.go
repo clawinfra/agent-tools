@@ -25,7 +25,7 @@ type Handler struct {
 func NewHandler(reg *registry.Registry, log *zap.Logger) http.Handler {
 	h := &Handler{reg: reg, log: log, mux: chi.NewRouter()}
 	h.routes()
-	return h.mux
+	return h
 }
 
 func (h *Handler) routes() {
@@ -53,6 +53,12 @@ func (h *Handler) routes() {
 		})
 
 		r.Post("/invoke", h.invokeTool)
+
+		r.Route("/providers", func(r chi.Router) {
+			r.Get("/", h.listProviders)
+			r.Post("/", h.registerProvider)
+			r.Get("/{id}", h.getProvider)
+		})
 	})
 }
 
@@ -157,6 +163,48 @@ func (h *Handler) deactivateTool(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// listProviders handles GET /v1/providers.
+func (h *Handler) listProviders(w http.ResponseWriter, r *http.Request) {
+	providers, err := h.reg.ListProviders(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"providers": providers})
+}
+
+// registerProvider handles POST /v1/providers.
+func (h *Handler) registerProvider(w http.ResponseWriter, r *http.Request) {
+	var req registry.Provider
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "INVALID_BODY", "invalid JSON")
+		return
+	}
+
+	provider, err := h.reg.RegisterProvider(r.Context(), &req)
+	if err != nil {
+		h.log.Error("register provider", zap.Error(err))
+		writeError(w, http.StatusBadRequest, "INVALID_REQUEST", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, provider)
+}
+
+// getProvider handles GET /v1/providers/{id}.
+func (h *Handler) getProvider(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	provider, err := h.reg.GetProvider(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, registry.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "PROVIDER_NOT_FOUND", "provider not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, provider)
 }
 
 // invokeTool handles POST /v1/invoke.

@@ -170,3 +170,165 @@ func TestInvokeTool_NotImplemented(t *testing.T) {
 	})
 	assert.Equal(t, http.StatusNotImplemented, rr.Code)
 }
+
+func validProviderPayload() map[string]any {
+	return map[string]any{
+		"id":       "did:claw:agent:test-provider",
+		"name":     "Test Provider",
+		"endpoint": "grpc://localhost:50051",
+		"pubkey":   "ed25519pubkey1234",
+	}
+}
+
+func TestListProviders_Empty(t *testing.T) {
+	h := newTestHandler(t)
+	rr := doRequest(t, h, http.MethodGet, "/v1/providers", nil)
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestRegisterProvider_Success(t *testing.T) {
+	h := newTestHandler(t)
+	rr := doRequest(t, h, http.MethodPost, "/v1/providers", validProviderPayload())
+	assert.Equal(t, http.StatusCreated, rr.Code)
+
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+	assert.Equal(t, "did:claw:agent:test-provider", resp["id"])
+}
+
+func TestRegisterProvider_InvalidJSON(t *testing.T) {
+	h := newTestHandler(t)
+	req := httptest.NewRequest(http.MethodPost, "/v1/providers", bytes.NewBufferString("{bad}"))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestRegisterProvider_MissingFields(t *testing.T) {
+	h := newTestHandler(t)
+	rr := doRequest(t, h, http.MethodPost, "/v1/providers", map[string]any{"id": "did:claw:agent:x"})
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestGetProvider_Success(t *testing.T) {
+	h := newTestHandler(t)
+
+	rr := doRequest(t, h, http.MethodPost, "/v1/providers", validProviderPayload())
+	require.Equal(t, http.StatusCreated, rr.Code)
+
+	rr2 := doRequest(t, h, http.MethodGet, "/v1/providers/did:claw:agent:test-provider", nil)
+	assert.Equal(t, http.StatusOK, rr2.Code)
+}
+
+func TestGetProvider_NotFound(t *testing.T) {
+	h := newTestHandler(t)
+	rr := doRequest(t, h, http.MethodGet, "/v1/providers/did:claw:agent:nonexistent", nil)
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestDeleteTool_Success(t *testing.T) {
+	h := newTestHandler(t)
+
+	// Register with a known provider DID
+	payload := validToolPayload()
+	req := httptest.NewRequest(http.MethodPost, "/v1/tools", mustEncode(t, payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer did:claw:agent:owner")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	require.Equal(t, http.StatusCreated, rr.Code)
+
+	var created map[string]any
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&created))
+	id := created["id"].(string)
+
+	// Delete as same provider
+	delReq := httptest.NewRequest(http.MethodDelete, "/v1/tools/"+id, nil)
+	delReq.Header.Set("Authorization", "Bearer did:claw:agent:owner")
+	delRr := httptest.NewRecorder()
+	h.ServeHTTP(delRr, delReq)
+	assert.Equal(t, http.StatusNoContent, delRr.Code)
+}
+
+func mustEncode(t *testing.T, v any) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	require.NoError(t, json.NewEncoder(&buf).Encode(v))
+	return &buf
+}
+
+func TestHandler_ServeHTTP_Direct(t *testing.T) {
+	h := newTestHandler(t)
+	// Test that ServeHTTP works (currently 0% coverage)
+	rr := doRequest(t, h, http.MethodGet, "/healthz", nil)
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestListTools_WithPagination(t *testing.T) {
+	h := newTestHandler(t)
+
+	// Register several tools
+	for i := 0; i < 5; i++ {
+		p := validToolPayload()
+		p["name"] = "tool-" + string(rune('a'+i))
+		rr := doRequest(t, h, http.MethodPost, "/v1/tools", p)
+		require.Equal(t, http.StatusCreated, rr.Code)
+	}
+
+	rr := doRequest(t, h, http.MethodGet, "/v1/tools?page=1&limit=3", nil)
+	assert.Equal(t, http.StatusOK, rr.Code)
+
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+	tools := resp["tools"].([]any)
+	assert.Len(t, tools, 3)
+}
+
+func TestSearchTools_WithQuery(t *testing.T) {
+	h := newTestHandler(t)
+
+	p := validToolPayload()
+	p["name"] = "contract-auditor"
+	p["description"] = "audits smart contracts for vulnerabilities"
+	rr := doRequest(t, h, http.MethodPost, "/v1/tools", p)
+	require.Equal(t, http.StatusCreated, rr.Code)
+
+	rr2 := doRequest(t, h, http.MethodGet, "/v1/tools/search?q=auditor&limit=10", nil)
+	assert.Equal(t, http.StatusOK, rr2.Code)
+}
+
+func TestProviderIDFromRequest_Bearer(t *testing.T) {
+	h := newTestHandler(t)
+	p := validToolPayload()
+	req := httptest.NewRequest(http.MethodPost, "/v1/tools", mustEncode(t, p))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer did:claw:agent:my-provider")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+}
+
+func TestProviderIDFromRequest_Raw(t *testing.T) {
+	h := newTestHandler(t)
+	p := validToolPayload()
+	p["name"] = "raw-auth-tool"
+	req := httptest.NewRequest(http.MethodPost, "/v1/tools", mustEncode(t, p))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "did:claw:agent:raw-provider")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+}
+
+func TestRegisterProvider_Upsert(t *testing.T) {
+	h := newTestHandler(t)
+
+	// First registration
+	rr := doRequest(t, h, http.MethodPost, "/v1/providers", validProviderPayload())
+	require.Equal(t, http.StatusCreated, rr.Code)
+
+	// Upsert same provider — should succeed
+	rr2 := doRequest(t, h, http.MethodPost, "/v1/providers", validProviderPayload())
+	assert.Equal(t, http.StatusCreated, rr2.Code)
+}
