@@ -78,13 +78,13 @@ func (p *Plugin) SearchTools(ctx context.Context, query string, opts ...agenttoo
 // SkillSpec describes an EvoClaw skill for tool registration.
 // This mirrors the evoclaw skill interface — imported without circular deps.
 type SkillSpec struct {
+	Schema      map[string]any
+	Tags        []string
 	Name        string
 	Version     string
 	Description string
-	Tags        []string
 	Endpoint    string
 	TimeoutMS   int64
-	Schema      map[string]any
 	PricingCLAW float64
 }
 

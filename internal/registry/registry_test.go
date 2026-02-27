@@ -425,13 +425,13 @@ func TestListProviders(t *testing.T) {
 	assert.Empty(t, providers)
 
 	for i := 0; i < 3; i++ {
-		_, err := r.RegisterProvider(ctx, &registry.Provider{
+		_, regErr := r.RegisterProvider(ctx, &registry.Provider{
 			ID:       "did:claw:agent:p" + string(rune('0'+i)),
 			Name:     "Provider " + string(rune('A'+i)),
 			Endpoint: "grpc://localhost:5005" + string(rune('1'+i)),
 			PubKey:   "pubkey" + string(rune('0'+i)),
 		})
-		require.NoError(t, err)
+		require.NoError(t, regErr)
 	}
 
 	providers, err = r.ListProviders(ctx)
@@ -463,6 +463,8 @@ func TestInvokeRequest_Types(t *testing.T) {
 	}
 	assert.Equal(t, "did:claw:tool:abc", req.ToolID)
 	assert.Equal(t, "5.0", req.BudgetCLAW)
+	assert.Equal(t, "did:claw:agent:consumer", req.ConsumerID)
+	assert.Equal(t, map[string]any{"key": "value"}, req.Input)
 }
 
 func TestReceipt_Fields(t *testing.T) {
@@ -480,6 +482,13 @@ func TestReceipt_Fields(t *testing.T) {
 	}
 	assert.Equal(t, "rcpt_abc", r.ID)
 	assert.Equal(t, "5.0", r.CostCLAW)
+	assert.Equal(t, "did:claw:tool:xyz", r.ToolID)
+	assert.Equal(t, "did:claw:agent:consumer", r.ConsumerID)
+	assert.Equal(t, "did:claw:agent:provider", r.ProviderID)
+	assert.Equal(t, "sha256:abc", r.InputHash)
+	assert.Equal(t, "sha256:def", r.OutputHash)
+	assert.Equal(t, now, r.ExecutedAt)
+	assert.Equal(t, "ed25519:sig", r.ProviderSig)
 }
 
 func TestSearchQuery_Defaults(t *testing.T) {

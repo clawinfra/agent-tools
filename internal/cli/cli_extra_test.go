@@ -45,16 +45,16 @@ func fakeTool(name string) map[string]any {
 	}
 }
 
-func writeJSONResp(w http.ResponseWriter, code int, v any) {
+func writeJSONResp(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(v)
 }
 
 // TestToolListCmd_Empty tests that "tool list" succeeds with empty registry.
 func TestToolListCmd_Empty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSONResp(w, 200, toolListResponse(nil))
+		writeJSONResp(w, toolListResponse(nil))
 	}))
 	defer srv.Close()
 
@@ -67,7 +67,7 @@ func TestToolListCmd_Empty(t *testing.T) {
 // TestToolListCmd_WithTools tests that "tool list" succeeds when tools exist.
 func TestToolListCmd_WithTools(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSONResp(w, 200, toolListResponse([]map[string]any{fakeTool("my-tool")}))
+		writeJSONResp(w, toolListResponse([]map[string]any{fakeTool("my-tool")}))
 	}))
 	defer srv.Close()
 
@@ -89,7 +89,7 @@ func TestToolListCmd_ServerError(t *testing.T) {
 // TestToolSearchCmd_NoResults tests success when no tools found.
 func TestToolSearchCmd_NoResults(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSONResp(w, 200, searchResponse(nil))
+		writeJSONResp(w, searchResponse(nil))
 	}))
 	defer srv.Close()
 
@@ -103,7 +103,7 @@ func TestToolSearchCmd_NoResults(t *testing.T) {
 func TestToolSearchCmd_WithResults(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tools := []map[string]any{fakeTool("weather-tool")}
-		writeJSONResp(w, 200, searchResponse(tools))
+		writeJSONResp(w, searchResponse(tools))
 	}))
 	defer srv.Close()
 
@@ -118,7 +118,7 @@ func TestToolSearchCmd_WithMaxPrice(t *testing.T) {
 	var gotMaxPrice string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotMaxPrice = r.URL.Query().Get("max_price_claw")
-		writeJSONResp(w, 200, searchResponse(nil))
+		writeJSONResp(w, searchResponse(nil))
 	}))
 	defer srv.Close()
 
@@ -134,7 +134,7 @@ func TestToolSearchCmd_WithPricing(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tool := fakeTool("priced-tool")
 		tool["pricing"] = map[string]any{"model": "per_call", "amount_claw": "0.5"}
-		writeJSONResp(w, 200, searchResponse([]map[string]any{tool}))
+		writeJSONResp(w, searchResponse([]map[string]any{tool}))
 	}))
 	defer srv.Close()
 
