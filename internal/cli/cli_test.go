@@ -63,8 +63,8 @@ func TestInitCmd_Idempotent(t *testing.T) {
 	// Change to temp dir to avoid polluting workspace
 	origDir, _ := os.Getwd()
 	tmpDir := t.TempDir()
-	os.Chdir(tmpDir)
-	t.Cleanup(func() { os.Chdir(origDir) })
+	require.NoError(t, os.Chdir(tmpDir))
+	t.Cleanup(func() { require.NoError(t, os.Chdir(origDir)) })
 
 	err := root.Execute()
 	assert.NoError(t, err)

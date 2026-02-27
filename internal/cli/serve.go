@@ -28,13 +28,13 @@ func newServeCmd() *cobra.Command {
 		Short: "Start the agent-tools registry server",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			log, _ := zap.NewProduction()
-			defer log.Sync() //nolint:errcheck
+			defer log.Sync() //nolint:errcheck // Sync error on stderr is non-actionable
 
 			db, err := store.Open(dbPath)
 			if err != nil {
 				return fmt.Errorf("open store: %w", err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 
 			reg := registry.New(db, log)
 			handler := api.NewHandler(reg, log)

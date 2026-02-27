@@ -9,18 +9,18 @@ import (
 
 // Tool represents a registered tool in the registry.
 type Tool struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Version     string     `json:"version"`
-	Description string     `json:"description"`
-	Schema      ToolSchema `json:"schema"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	CreatedAt   time.Time  `json:"created_at"`
 	Pricing     *Pricing   `json:"pricing"`
 	ProviderID  string     `json:"provider_id"`
+	Description string     `json:"description"`
+	ID          string     `json:"id"`
 	Endpoint    string     `json:"endpoint"`
-	TimeoutMS   int64      `json:"timeout_ms"`
+	Version     string     `json:"version"`
+	Name        string     `json:"name"`
+	Schema      ToolSchema `json:"schema"`
 	Tags        []string   `json:"tags"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	TimeoutMS   int64      `json:"timeout_ms"`
 	IsActive    bool       `json:"is_active"`
 }
 
@@ -70,28 +70,28 @@ func (p *Pricing) String() string {
 
 // Provider represents an agent that provides tools.
 type Provider struct {
+	CreatedAt  time.Time `json:"created_at"`
+	LastSeen   time.Time `json:"last_seen"`
 	ID         string    `json:"id"`
 	Name       string    `json:"name"`
 	Endpoint   string    `json:"endpoint"`
 	PubKey     string    `json:"pubkey"`
 	StakeCLAW  string    `json:"stake_claw"`
 	Reputation int64     `json:"reputation"`
-	CreatedAt  time.Time `json:"created_at"`
-	LastSeen   time.Time `json:"last_seen"`
 }
 
 // RegisterToolRequest is the input for tool registration.
 type RegisterToolRequest struct {
+	Pricing     *Pricing        `json:"pricing"`
 	Name        string          `json:"name"`
 	Version     string          `json:"version"`
 	Description string          `json:"description"`
-	Schema      ToolSchema      `json:"schema"`
-	Pricing     *Pricing        `json:"pricing"`
 	Endpoint    string          `json:"endpoint"`
-	TimeoutMS   int64           `json:"timeout_ms"`
+	ProviderID  string          `json:"-"`
+	Schema      ToolSchema      `json:"schema"`
 	Tags        []string        `json:"tags"`
-	ProviderID  string          `json:"-"` // set from auth context
-	RawSchema   json.RawMessage `json:"-"` // original schema JSON
+	RawSchema   json.RawMessage `json:"-"`
+	TimeoutMS   int64           `json:"timeout_ms"`
 }
 
 // Validate checks that a registration request is valid.
@@ -126,26 +126,26 @@ type SearchQuery struct {
 
 // SearchResult is the response from a tool search.
 type SearchResult struct {
-	Tools   []*Tool `json:"tools"`
-	Total   int     `json:"total"`
-	Page    int     `json:"page"`
-	Limit   int     `json:"limit"`
-	Query   string  `json:"query,omitempty"`
+	Query string  `json:"query,omitempty"`
+	Tools []*Tool `json:"tools"`
+	Total int     `json:"total"`
+	Page  int     `json:"page"`
+	Limit int     `json:"limit"`
 }
 
 // Invocation tracks a single tool invocation lifecycle.
 type Invocation struct {
-	ID          string    `json:"id"`
-	ToolID      string    `json:"tool_id"`
-	ConsumerID  string    `json:"consumer_id"`
-	InputHash   string    `json:"input_hash"`
-	OutputHash  string    `json:"output_hash,omitempty"`
-	ReceiptSig  string    `json:"receipt_sig,omitempty"`
-	Status      string    `json:"status"`
-	CostCLAW    string    `json:"cost_claw,omitempty"`
-	StartedAt   time.Time `json:"started_at"`
+	ID          string     `json:"id"`
+	ToolID      string     `json:"tool_id"`
+	ConsumerID  string     `json:"consumer_id"`
+	InputHash   string     `json:"input_hash"`
+	OutputHash  string     `json:"output_hash,omitempty"`
+	ReceiptSig  string     `json:"receipt_sig,omitempty"`
+	Status      string     `json:"status"`
+	CostCLAW    string     `json:"cost_claw,omitempty"`
+	StartedAt   time.Time  `json:"started_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	Error       string    `json:"error,omitempty"`
+	Error       string     `json:"error,omitempty"`
 }
 
 // InvokeRequest is the input for invoking a tool.

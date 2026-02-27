@@ -28,7 +28,7 @@ func TestOpen_DirCreationFailure(t *testing.T) {
 	// Create a file where the dir should be, causing MkdirAll to fail
 	tmp := t.TempDir()
 	blockingFile := tmp + "/blocking"
-	require.NoError(t, os.WriteFile(blockingFile, []byte("block"), 0o644))
+	require.NoError(t, os.WriteFile(blockingFile, []byte("block"), 0o600))
 
 	// Try to create DB inside a "directory" that is actually a file
 	_, err := store.Open(blockingFile + "/agent-tools.db")
@@ -39,7 +39,7 @@ func TestOpen_IdempotentMigration(t *testing.T) {
 	path := t.TempDir() + "/test.db"
 	db, err := store.Open(path)
 	require.NoError(t, err)
-	db.Close()
+	require.NoError(t, db.Close())
 
 	// Open again — migrations should run without error (IF NOT EXISTS guards)
 	db2, err := store.Open(path)

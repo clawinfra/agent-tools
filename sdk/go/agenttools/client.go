@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+// pricingFree is the free pricing model identifier.
+const pricingFree = "free"
+
 // Client is an agent-tools registry client.
 type Client struct {
 	baseURL    string
@@ -47,16 +50,16 @@ func NewClient(baseURL string, opts ...ClientOption) *Client {
 
 // Tool represents a registered tool.
 type Tool struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Version     string     `json:"version"`
-	Description string     `json:"description"`
-	Pricing     *Pricing   `json:"pricing"`
-	ProviderID  string     `json:"provider_id"`
-	Endpoint    string     `json:"endpoint"`
-	TimeoutMS   int64      `json:"timeout_ms"`
-	Tags        []string   `json:"tags"`
-	CreatedAt   time.Time  `json:"created_at"`
+	CreatedAt   time.Time `json:"created_at"`
+	Pricing     *Pricing  `json:"pricing"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Version     string    `json:"version"`
+	Description string    `json:"description"`
+	ProviderID  string    `json:"provider_id"`
+	Endpoint    string    `json:"endpoint"`
+	Tags        []string  `json:"tags"`
+	TimeoutMS   int64     `json:"timeout_ms"`
 }
 
 // Pricing describes invocation cost.
@@ -67,22 +70,22 @@ type Pricing struct {
 
 // String returns a human-readable pricing description.
 func (p *Pricing) String() string {
-	if p == nil || p.Model == "free" {
-		return "free"
+	if p == nil || p.Model == pricingFree {
+		return pricingFree
 	}
 	return fmt.Sprintf("%s CLAW/%s", p.AmountCLAW, p.Model)
 }
 
 // RegisterToolRequest is input for tool registration.
 type RegisterToolRequest struct {
+	Schema      map[string]any `json:"schema"`
+	Pricing     *Pricing       `json:"pricing,omitempty"`
 	Name        string         `json:"name"`
 	Version     string         `json:"version"`
 	Description string         `json:"description"`
-	Schema      map[string]any `json:"schema"`
-	Pricing     *Pricing       `json:"pricing,omitempty"`
 	Endpoint    string         `json:"endpoint"`
-	TimeoutMS   int64          `json:"timeout_ms,omitempty"`
 	Tags        []string       `json:"tags,omitempty"`
+	TimeoutMS   int64          `json:"timeout_ms,omitempty"`
 }
 
 // ListToolsRequest is input for listing tools.
@@ -103,8 +106,8 @@ type ToolList struct {
 type SearchOption func(*searchOptions)
 
 type searchOptions struct {
-	maxPrice float64
 	tag      string
+	maxPrice float64
 	limit    int
 }
 
@@ -125,9 +128,9 @@ func WithLimit(limit int) SearchOption {
 
 // SearchResult is the response from a tool search.
 type SearchResult struct {
+	Query string  `json:"query,omitempty"`
 	Tools []*Tool `json:"tools"`
 	Total int     `json:"total"`
-	Query string  `json:"query,omitempty"`
 }
 
 // RegisterTool registers a new tool in the registry.
@@ -189,7 +192,7 @@ func (c *Client) Healthz(ctx context.Context) error {
 }
 
 func (c *Client) get(ctx context.Context, path string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -229,7 +232,7 @@ func (c *Client) do(req *http.Request, out any) error {
 	if err != nil {
 		return fmt.Errorf("http: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		var e apiErrorResponse

@@ -34,8 +34,8 @@ type Config struct {
 //   - Auto-register skills as tools (if auto_register=true)
 //   - Expose a tool invocation interface to the agent runtime
 type Plugin struct {
-	cfg    Config
 	client *agenttools.Client
+	cfg    Config
 }
 
 // New creates a new Plugin from config.
@@ -79,17 +79,17 @@ func (p *Plugin) SearchTools(ctx context.Context, query string, opts ...agenttoo
 // This mirrors the evoclaw skill interface — imported without circular deps.
 type SkillSpec struct {
 	Schema      map[string]any
-	Tags        []string
 	Name        string
 	Version     string
 	Description string
 	Endpoint    string
+	Tags        []string
 	TimeoutMS   int64
 	PricingCLAW float64
 }
 
 // RegisterSkill registers a skill as a tool in the registry.
-func (p *Plugin) RegisterSkill(ctx context.Context, skill SkillSpec) (*agenttools.Tool, error) {
+func (p *Plugin) RegisterSkill(ctx context.Context, skill *SkillSpec) (*agenttools.Tool, error) {
 	pricingModel := "free"
 	pricingAmount := ""
 	if skill.PricingCLAW > 0 {
@@ -120,11 +120,11 @@ func (p *Plugin) RegisterSkill(ctx context.Context, skill SkillSpec) (*agenttool
 func defaultSchema() map[string]any {
 	return map[string]any{
 		"input": map[string]any{
-			"type": "object",
+			"type":                 "object",
 			"additionalProperties": true,
 		},
 		"output": map[string]any{
-			"type": "object",
+			"type":                 "object",
 			"additionalProperties": true,
 		},
 	}

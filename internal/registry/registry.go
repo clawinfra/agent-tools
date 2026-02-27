@@ -111,7 +111,7 @@ func (r *Registry) ListTools(ctx context.Context, page, limit int) (*SearchResul
 	if err != nil {
 		return nil, fmt.Errorf("list tools: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	tools, err := scanTools(rows)
 	if err != nil {
@@ -166,7 +166,7 @@ func (r *Registry) SearchTools(ctx context.Context, q *SearchQuery) (*SearchResu
 	if err != nil {
 		return nil, fmt.Errorf("search tools: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	tools, err := scanTools(rows)
 	if err != nil {
@@ -247,7 +247,7 @@ func (r *Registry) ListProviders(ctx context.Context) ([]*Provider, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list providers: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var providers []*Provider
 	for rows.Next() {
@@ -348,13 +348,13 @@ func makeToolDID(name, version, providerID string) string {
 
 func scanTool(row *sql.Row) (*Tool, error) {
 	var (
-		t          Tool
-		schemaJSON string
+		t           Tool
+		schemaJSON  string
 		pricingJSON string
-		tags       string
-		createdAt  int64
-		updatedAt  int64
-		isActive   int
+		tags        string
+		createdAt   int64
+		updatedAt   int64
+		isActive    int
 	)
 	err := row.Scan(
 		&t.ID, &t.Name, &t.Version, &t.Description,

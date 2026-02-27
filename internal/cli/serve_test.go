@@ -13,7 +13,7 @@ func TestServeCmd_BadDBPath(t *testing.T) {
 	// Create a file that blocks directory creation for the DB path.
 	tmp := t.TempDir()
 	blockingFile := tmp + "/blocking"
-	require.NoError(t, os.WriteFile(blockingFile, []byte("block"), 0o644))
+	require.NoError(t, os.WriteFile(blockingFile, []byte("block"), 0o600))
 
 	root := cli.NewRootCmd()
 	// Try to use a path inside the blocking file as a directory.

@@ -63,10 +63,10 @@ func TestGetProvider_InternalError(t *testing.T) {
 func TestRegisterTool_InternalError(t *testing.T) {
 	h := newBrokenHandler(t)
 	payload := map[string]any{
-		"name":      "test-tool",
-		"version":   "1.0.0",
-		"endpoint":  "https://example.com",
-		"schema":    map[string]any{"type": "object"},
+		"name":     "test-tool",
+		"version":  "1.0.0",
+		"endpoint": "https://example.com",
+		"schema":   map[string]any{"type": "object"},
 	}
 	rr := doRequest(t, h, http.MethodPost, "/v1/tools", payload)
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)

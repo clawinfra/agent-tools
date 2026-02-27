@@ -15,7 +15,7 @@ func newInitCmd() *cobra.Command {
 		RunE: func(_ *cobra.Command, _ []string) error {
 			dirs := []string{"data", "schemas"}
 			for _, d := range dirs {
-				if err := os.MkdirAll(d, 0o755); err != nil {
+				if err := os.MkdirAll(d, 0o750); err != nil {
 					return fmt.Errorf("create %s: %w", d, err)
 				}
 			}
@@ -34,7 +34,7 @@ db   = "./data/agent-tools.db"
 [clawchain]
 # ws_url = "ws://testnet.clawchain.win:9944"
 `
-			if err := os.WriteFile(cfgPath, []byte(cfg), 0o644); err != nil {
+			if err := os.WriteFile(cfgPath, []byte(cfg), 0o600); err != nil {
 				return fmt.Errorf("write config: %w", err)
 			}
 

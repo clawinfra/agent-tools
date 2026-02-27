@@ -118,7 +118,7 @@ func TestRegisterSkill_Free(t *testing.T) {
 
 	p, err := evoclawplugin.New(evoclawplugin.Config{RegistryURL: srv.URL})
 	require.NoError(t, err)
-	tool, err := p.RegisterSkill(context.Background(), evoclawplugin.SkillSpec{
+	tool, err := p.RegisterSkill(context.Background(), &evoclawplugin.SkillSpec{
 		Name:     "my-skill",
 		Version:  "1.0.0",
 		Endpoint: "http://example.com",
@@ -140,7 +140,7 @@ func TestRegisterSkill_WithPricing(t *testing.T) {
 
 	p, err := evoclawplugin.New(evoclawplugin.Config{RegistryURL: srv.URL})
 	require.NoError(t, err)
-	tool, err := p.RegisterSkill(context.Background(), evoclawplugin.SkillSpec{
+	tool, err := p.RegisterSkill(context.Background(), &evoclawplugin.SkillSpec{
 		Name:        "priced-skill",
 		Version:     "1.0.0",
 		Endpoint:    "http://example.com",
@@ -158,7 +158,7 @@ func TestRegisterSkill_WithSchema(t *testing.T) {
 
 	p, err := evoclawplugin.New(evoclawplugin.Config{RegistryURL: srv.URL})
 	require.NoError(t, err)
-	tool, err := p.RegisterSkill(context.Background(), evoclawplugin.SkillSpec{
+	tool, err := p.RegisterSkill(context.Background(), &evoclawplugin.SkillSpec{
 		Name:     "schema-skill",
 		Version:  "1.0.0",
 		Endpoint: "http://example.com",
@@ -171,7 +171,7 @@ func TestRegisterSkill_WithSchema(t *testing.T) {
 func TestRegisterSkill_Error(t *testing.T) {
 	p, err := evoclawplugin.New(evoclawplugin.Config{RegistryURL: "http://127.0.0.1:1"})
 	require.NoError(t, err)
-	_, err = p.RegisterSkill(context.Background(), evoclawplugin.SkillSpec{
+	_, err = p.RegisterSkill(context.Background(), &evoclawplugin.SkillSpec{
 		Name:    "x",
 		Version: "1.0.0",
 	})

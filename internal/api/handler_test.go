@@ -19,7 +19,7 @@ func newTestHandler(t *testing.T) http.Handler {
 	t.Helper()
 	db, err := store.Open(":memory:")
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 
 	reg := registry.New(db, zaptest.NewLogger(t))
 	return api.NewHandler(reg, zaptest.NewLogger(t))
@@ -244,7 +244,7 @@ func TestDeleteTool_Success(t *testing.T) {
 	id := created["id"].(string)
 
 	// Delete as same provider
-	delReq := httptest.NewRequest(http.MethodDelete, "/v1/tools/"+id, nil)
+	delReq := httptest.NewRequest(http.MethodDelete, "/v1/tools/"+id, http.NoBody)
 	delReq.Header.Set("Authorization", "Bearer did:claw:agent:owner")
 	delRr := httptest.NewRecorder()
 	h.ServeHTTP(delRr, delReq)

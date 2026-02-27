@@ -164,8 +164,8 @@ func TestToolSearchCmd_MissingQuery(t *testing.T) {
 func TestInitCmd_WritesConfig(t *testing.T) {
 	origDir, _ := os.Getwd()
 	tmpDir := t.TempDir()
-	os.Chdir(tmpDir)
-	t.Cleanup(func() { os.Chdir(origDir) })
+	require.NoError(t, os.Chdir(tmpDir))
+	t.Cleanup(func() { require.NoError(t, os.Chdir(origDir)) })
 
 	root := cli.NewRootCmd()
 	root.SetArgs([]string{"init"})

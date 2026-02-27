@@ -2,6 +2,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -17,7 +18,7 @@ type DB struct {
 
 // Open opens (or creates) the SQLite database at path and runs migrations.
 func Open(path string) (*DB, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, fmt.Errorf("create db dir: %w", err)
 	}
 
@@ -26,7 +27,7 @@ func Open(path string) (*DB, error) {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 
-	if err := db.Ping(); err != nil {
+	if err := db.PingContext(context.Background()); err != nil {
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 
@@ -40,7 +41,7 @@ func Open(path string) (*DB, error) {
 
 // migrate runs all schema migrations idempotently.
 func (db *DB) migrate() error {
-	_, err := db.Exec(schema)
+	_, err := db.ExecContext(context.Background(), schema)
 	return err
 }
 
