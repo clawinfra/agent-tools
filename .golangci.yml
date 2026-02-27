@@ -1,27 +1,26 @@
-version: "2"
+linters-settings:
+  govet:
+    enable-all: true
+  gocyclo:
+    min-complexity: 15
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  misspell:
+    locale: US
+  lll:
+    line-length: 140
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
 
 linters:
-  settings:
-    govet:
-      enable-all: true
-    gocyclo:
-      min-complexity: 15
-    dupl:
-      threshold: 100
-    goconst:
-      min-len: 2
-      min-occurrences: 2
-    misspell:
-      locale: US
-    lll:
-      line-length: 140
-    gocritic:
-      enabled-tags:
-        - diagnostic
-        - experimental
-        - opinionated
-        - performance
-        - style
   enable:
     - bodyclose
     - dogsled
@@ -29,6 +28,8 @@ linters:
     - errcheck
     - copyloopvar
     - exhaustive
+    - gofmt
+    - goimports
     - goconst
     - gocritic
     - gocyclo
@@ -46,11 +47,6 @@ linters:
     - unparam
     - unused
     - whitespace
-
-formatters:
-  enable:
-    - gofmt
-    - goimports
 
 issues:
   exclude-rules:

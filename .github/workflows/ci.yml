@@ -31,14 +31,14 @@ jobs:
         run: go mod download
 
       - name: Build
-        run: go build ./...
+        run: CGO_ENABLED=1 go build -tags "sqlite_fts5" ./...
 
       - name: Vet
-        run: go vet ./...
+        run: CGO_ENABLED=1 go vet -tags "sqlite_fts5" ./...
 
       - name: Test with coverage
         run: |
-          go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+          CGO_ENABLED=1 go test -v -race -tags "sqlite_fts5" -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Check coverage threshold (90%)
         run: |
@@ -72,8 +72,8 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
-          args: --timeout=5m
+          version: v1.64.8
+          args: --timeout=5m --build-tags sqlite_fts5
 
   build-docker:
     name: Docker Build
