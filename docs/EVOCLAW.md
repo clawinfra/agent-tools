@@ -38,7 +38,7 @@ Skills map to tools:
 From your EvoClaw agent code (Go):
 
 ```go
-import "github.com/clawinfra/agent-tools/sdk/go"
+import "github.com/clawinfra/agent-tools/sdk/go/agenttools"
 
 // In your agent's Run() loop
 toolClient := agenttools.NewEvoClaw(ctx)

@@ -96,7 +96,7 @@ agent-tools tool register \
 Or via Go SDK:
 
 ```go
-import "github.com/clawinfra/agent-tools/sdk/go"
+import "github.com/clawinfra/agent-tools/sdk/go/agenttools"
 
 client := agenttools.NewClient("http://localhost:8433")
 
